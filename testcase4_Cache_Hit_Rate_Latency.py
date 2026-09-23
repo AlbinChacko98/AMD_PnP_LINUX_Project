@@ -1,13 +1,19 @@
-from test_utility import run_cmd, log_output
+import json
+from test_utility import command_exists, log_output, run_cmd
 
-def test_cache():
-    print("Running perf cache metrics...")
-    perf = run_cmd("perf stat -e L1-dcache-load-misses,LLC-load-misses sleep 5")
-    
-    print("Running cachegrind...")
-    cachegrind = run_cmd("valgrind --tool=cachegrind ls")
-    
-    log_output("cache_test", perf + "\n" + cachegrind)
+def main():
+    result = {}
+    result["tools"] = {tool: command_exists(tool) for tool in ("perf", "valgrind", "lmbench")}
+    if result["tools"]["perf"]:
+        result["perf_cache"] = run_cmd(
+            "perf stat -e L1-dcache-load-misses,LLC-loads,LLC-load-misses ls"
+        )
+    if result["tools"]["valgrind"]:
+        result["cachegrind"] = run_cmd("valgrind --tool=cachegrind ls")
+    if result["tools"]["lmbench"]:
+        result["lat_mem_rd"] = run_cmd("lat_mem_rd 4 512")
+
+    log_output("cache_test", json.dumps(result, indent=4))
 
 if __name__ == "__main__":
-    test_cache()
+    main()

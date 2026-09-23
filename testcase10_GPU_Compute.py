@@ -1,17 +1,20 @@
-# tests/gpu_compute.py
-from test_utility import run_cmd, log_output
+import json
+from test_utility import command_exists, log_output, run_cmd
 
 def run():
-    clinfo = run_cmd("clinfo | grep -E 'Device|Compute Units'")
-    clpeak = run_cmd("clpeak")
+    result = {
+        "tools": {tool: command_exists(tool) for tool in ("clinfo", "clpeak", "rocm-bandwidth-test", "hashcat")}
+    }
+    if result["tools"]["clinfo"]:
+        result["clinfo"] = run_cmd("clinfo | grep -E 'Platform|Device|Compute Units|MAX_COMPUTE'")
+    if result["tools"]["clpeak"]:
+        result["clpeak"] = run_cmd("clpeak")
+    if result["tools"]["rocm-bandwidth-test"]:
+        result["rocm_bandwidth"] = run_cmd("rocm-bandwidth-test -t 3")
+    if result["tools"]["hashcat"]:
+        result["hashcat"] = run_cmd("hashcat -b -D 2")
 
-    output = f"""
-=== GPU COMPUTE ===
-{clinfo}
-
-{clpeak}
-"""
-    log_output("gpu_compute", output)
+    log_output("gpu_compute", json.dumps(result, indent=4))
 
 if __name__ == "__main__":
     run()
