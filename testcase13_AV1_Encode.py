@@ -1,27 +1,28 @@
 # tests/av1_encode.py
-from test_utility import run_cmd, log_output
+import json
+from datetime import datetime
+from test_utility import LOGS_DIR, command_exists, log_output, run_cmd
 import os
 
 def run():
-    if not os.path.exists("/dev/dri/renderD128"):
-        log_output("av1_encode", "AV1 NOT AVAILABLE")
+    result = {"tools": {tool: command_exists(tool) for tool in ("vainfo", "ffmpeg")}}
+    device = os.environ.get("VAAPI_DEVICE", "/dev/dri/renderD128")
+    if not os.path.exists(device) or not result["tools"]["vainfo"] or not result["tools"]["ffmpeg"]:
+        result["status"] = "VAAPI or required tool unavailable"
+        log_output("av1_encode", json.dumps(result, indent=4))
         return
 
-    check = run_cmd("vainfo | grep AV1")
+    check = run_cmd(f"vainfo --display drm --device {device} | grep -i AV1")
+    output_file = os.path.join(LOGS_DIR, f"av1_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mkv")
 
-    encode = run_cmd("""
-    ffmpeg -hwaccel vaapi -hwaccel_device /dev/dri/renderD128 \
+    encode = run_cmd(f"""
+    ffmpeg -y -benchmark -hwaccel vaapi -hwaccel_device {device} \
     -f lavfi -i testsrc=duration=5:size=1280x720:rate=30 \
-    -c:v av1_vaapi out_av1.mp4
+    -vf 'format=nv12,hwupload' \
+    -c:v av1_vaapi -g 250 -qp 35 {output_file}
     """)
 
-    output = f"""
-=== AV1 ENCODE ===
-{check}
-
-{encode}
-"""
-    log_output("av1_encode", output)
+    log_output("av1_encode", json.dumps({"vaapi_check": check, "encode": encode, "output": output_file}, indent=4))
 
 if __name__ == "__main__":
     run()
